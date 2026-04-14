@@ -1,0 +1,7 @@
+PyQt5
+matplotlib
+scikit-learn
+pandas
+numpy
+joblib
+reportlab
