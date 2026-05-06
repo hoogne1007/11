@@ -20,8 +20,6 @@ def get_latest_model_path():
 def generate_prediction_data(num_months=6):
     """
     Loads the latest model and generates a forecast for a specified number of months.
-    Args:
-        num_months (int): Number of months to forecast (e.g., 3, 6, 9, 12)
     """
     # 1. Load the latest model
     model_path = get_latest_model_path()
@@ -55,9 +53,8 @@ def generate_prediction_data(num_months=6):
     if df_hist is None:
         return {"error": "Could not load historical data."}
 
-    # 3. Create future dates based on num_months
+    # 3. Create future dates
     last_date = df_hist['Date'].max()
-    # num_months-ийг ашиглан ирээдүйн огноог үүсгэх
     future_dates = pd.date_range(start=last_date, periods=num_months + 1, freq='MS')[1:] 
     
     df_future = pd.DataFrame({'Date': future_dates})
@@ -67,25 +64,32 @@ def generate_prediction_data(num_months=6):
     df_future['DayOfYear'] = df_future['Date'].dt.dayofyear
     df_future['WeekOfYear'] = df_future['Date'].dt.isocalendar().week.astype(int)
     
-    # Simple feature estimation for future
+    # --- Simple feature estimation for future (Updated here) ---
     df_future['MarketingSpend'] = df_hist['MarketingSpend'].mean() * 1.1 
+    
+    # Энд шинэ баганыг нэмэв: Түүхэн дунджаас 5% өсөлттэй байхаар тооцов
+    if 'EmployeeBenefits' in df_hist.columns:
+        df_future['EmployeeBenefits'] = df_hist['EmployeeBenefits'].mean() * 1.05
+    else:
+        df_future['EmployeeBenefits'] = 0 # Хэрэв багана байхгүй бол 0 утга өгнө
+        
     df_future['IsHoliday'] = [1 if m in [1, 5, 7, 12] else 0 for m in df_future['Month']]
+    # ----------------------------------------------------------
     
     # 4. Make predictions
+    # model_features дотор 'EmployeeBenefits' орсон байх тул df_future-ээс шууд авна
     X_future_df = df_future[model_features]
     
     if scaler:
         X_future_scaled = scaler.transform(X_future_df)
         future_predictions = model.predict(X_future_scaled)
     else:
-        # For tree-based models that don't need scaling
         future_predictions = model.predict(X_future_df.values)
 
     # For charting
     historical_x = np.arange(len(df_hist))
     predicted_x = np.arange(len(df_hist), len(df_hist) + len(df_future))
     
-    # Ирэх улирлын (эхний 3 сар) нийт борлуулалтын таамаглал
     next_q_val = sum(future_predictions[:3])
     
     return {
